@@ -152,7 +152,8 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))
         const char* wyn=tab;
         PyObject *str= PyUnicode_FromString(wyn);
         PyObject_Print(str,stdout,1);
-        //Py_DECREF(str);
+        //free(str);
+        Py_DECREF(str);
     }
     return Py_None;
 }
@@ -205,13 +206,13 @@ static PyTypeObject BoardType = {
 
 static PyModuleDef isingmodule = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "ising",
+    .m_name = "Ising",
     .m_doc = "Ising 2D board MC simulator",
     .m_size = -1,
 };
 
 PyMODINIT_FUNC
-PyInit_ising(void)
+PyInit_Ising(void)
 {
     PyObject *m;
     if (PyType_Ready(&BoardType) < 0)

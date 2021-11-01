@@ -1,9 +1,10 @@
 from distutils.core import setup, Extension
 
-module2D = Extension('ising',
-                    sources = ['src/ising.c'])
+parallel=["-fopenmp","-std=c11"]
 
-setup (name = 'Ising',
+module_ising2D = Extension('Ising', sources = ['src/ising.c'],extra_compile_args=parallel)
+
+setup (name = 'Metis',
        version = '1.0',
-       description = 'MC ising simulator',
-       ext_modules = [module2D])
+       description = 'MC statistical mechanic simulator',
+       ext_modules = [module_ising2D])
