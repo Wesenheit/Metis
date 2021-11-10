@@ -4,6 +4,8 @@
 #include <time.h>
 #include <stdlib.h>
 #include <math.h>
+#include <math.h>
+#include <omp.h>
 
 typedef struct
 {
@@ -28,7 +30,6 @@ board_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 board_init(board *self, PyObject *args, PyObject *kwds)
 {
-    srand(time(NULL));
     static char *kwlist[] = {"n",  NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,&self->n)) {return -1;}
     int n=self->n;
@@ -109,7 +110,7 @@ void eval(board *self,float T,float B)
         double c=rand()%10000/10000;
         if (c>exp(-E/T))
         {
-            self->tab[a][b]=-self->tab[a][b];
+            self->tab[a][b]=-(self->tab[a][b]);
         }
     }
 
@@ -128,6 +129,84 @@ board_MC(board *self, PyObject *args)
     }
     return Py_None;
 }
+
+
+void eval_para(board *self,float T,float B,int *cords, int num)
+{
+    double c;
+    int a=0;//cords[2*num];
+    int b=0;//cords[2*num+1];
+    double E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]);
+    if (E<0)
+    {
+        #pragma omp critical
+        self->tab[a][b]=-self->tab[a][b];
+        
+    }
+    else
+    {
+        //c=0;
+        c=rand()%10000/10000;
+        if (c>exp(-E/T))
+        {
+            #pragma omp critical
+            self->tab[a][b]=-(self->tab[a][b]);
+            
+        }
+    }
+
+}
+void gen(int *cords,int cores,int n)
+{
+    int a,b;
+    int flaga=1;
+    for (int i=0;i<cores;i++)
+    {
+        while (flaga)
+        {
+            a=rand()%n;
+            b=rand()%n;
+            flaga=0;
+            for (int j=0;j<i;j++)
+            {
+                if (abs(cords[2*j]-a)<=1 || abs(cords[2*j]-a)==n-1 ||abs(cords[2*j+1]-b)==n-1 ||abs(cords[2*j+1]-b)<=1)
+                {
+                    flaga=1;
+                }
+            }
+        }
+        flaga=1;
+        cords[2*i]=a;
+        cords[2*i+1]=b;
+    }
+}
+
+static PyObject *
+board_MC_para(board *self, PyObject *args)
+{
+    int number_of_steps;
+    int cores;
+    float T;
+    float B;
+    if (!PyArg_ParseTuple(args,"iffi",&number_of_steps,&T,&B,&cores)){return NULL;}
+    omp_set_num_threads(cores);
+    int cords[2*cores];
+    int num;
+    #pragma omp parallel //shared(cords,T,B,cores,number_of_steps)
+    {
+        for (int i=0;i<number_of_steps/cores;i++)
+        {
+            #pragma omp master
+            {
+                gen(cords,cores,self->n);
+            }
+            num=omp_get_thread_num();
+            eval_para(self,T,B,cords,num);   
+        }
+    }
+    return Py_None;
+}
+
 
 static PyObject *
 board_show(board *self, PyObject *Py_UNUSED(ignored))
@@ -153,7 +232,7 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))
         PyObject *str= PyUnicode_FromString(wyn);
         PyObject_Print(str,stdout,1);
         //free(str);
-        Py_DECREF(str);
+        //Py_DECREF(str);
     }
     return Py_None;
 }
@@ -181,11 +260,13 @@ static PyMethodDef board_methods[] = {
     {"mean", (PyCFunction) board_mean, METH_NOARGS,
      "calculate mean value in array"
     },
-    {"MC",(PyCFunction) board_MC,METH_VARARGS,
+    {"evolve",(PyCFunction) board_MC,METH_VARARGS,
     "evolve the board with Metropolis-Hastings algorithm"},
     {"show",(PyCFunction) board_show, METH_NOARGS,
     "print the board"
     },
+    {"evolvep",(PyCFunction) board_MC_para,METH_VARARGS,
+    "evolve the board with Metropolis-Hastings algorithm(parallel version)"},
     {NULL}  
 };
 
@@ -228,6 +309,6 @@ PyInit_Ising(void)
         Py_DECREF(m);
         return NULL;
     }
-
+    srand(time(NULL));
     return m;
 }
