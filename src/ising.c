@@ -139,7 +139,6 @@ void eval_para(board *self,float T,float B,int *cords, int num)
     double E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]);
     if (E<0)
     {
-        #pragma omp critical
         self->tab[a][b]=-self->tab[a][b];
         
     }
@@ -149,7 +148,6 @@ void eval_para(board *self,float T,float B,int *cords, int num)
         c=rand()%10000/10000;
         if (c>exp(-E/T))
         {
-            #pragma omp critical
             self->tab[a][b]=-(self->tab[a][b]);
             
         }
@@ -192,7 +190,7 @@ board_MC_para(board *self, PyObject *args)
     omp_set_num_threads(cores);
     int cords[2*cores];
     int num;
-    #pragma omp parallel //shared(cords,T,B,cores,number_of_steps)
+    #pragma omp parallel private(num)//shared(cords,T,B,cores,number_of_steps)
     {
         for (int i=0;i<number_of_steps/cores;i++)
         {
