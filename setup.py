@@ -1,6 +1,6 @@
 from distutils.core import setup, Extension
 
-parallel=["-fopenmp","-std=c11"]
+parallel=["-fopenmp","-std=c11","-g"]
 module_ising2D = Extension('Ising', sources = ['src/ising.c'],extra_compile_args=parallel,extra_link_args=['-lgomp'])
 
 setup (name = 'Metis',
