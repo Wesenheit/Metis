@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 #include "random.h"
 
 typedef struct
@@ -94,40 +95,97 @@ int down (int x,int n) //lower spin with periodic boundary conditions
 }
 
 
-void eval(board *self,float T,float B)
+void eval_para(board *self,float T,float B,int num,unsigned long *seed)
 {
-    int a,b;
-    a=rand()%(self->n);
-    b=rand()%(self->n);
-    double E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
-    if (E<0) //if energy is smaller just accept...
+    double c;
+    int a=randlin(seed)%self->n;
+    int b=randlin(seed)%self->n;
+    //a=cords[2*num]; //assigning cords to change
+    //b=cords[2*num+1];
+    double E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //same as in single thread
+    if (E<0)
     {
         self->tab[a][b]=-self->tab[a][b];
+        
     }
-    else //else accept with given propability
+    else
     {
-        double c=rand()%10000/10000;
+        //c=0;
+        c=rand()%10000/10000;
         if (c>exp(-E/T))
         {
             self->tab[a][b]=-(self->tab[a][b]);
+            
         }
     }
 
 }
+void gen(int *cords,unsigned long *seeds,int cores,int n) //generate table with coordinates for each thread with one master thread
+{
+    int a,b;
+    int flaga=1;
+    for (int i=0;i<cores;i++)
+    {
+        while (flaga)
+        {
+            a=(int) randlin(&seeds[0])%n;
+            b=(int) randlin(&seeds[0])%n;
+            flaga=0;
+            for (int j=0;j<i;j++)
+            {
+                if (abs(cords[2*j]-a)<=1 || abs(cords[2*j]-a)==n-1 ||abs(cords[2*j+1]-b)==n-1 ||abs(cords[2*j+1]-b)<=1)//checking if change at given coordinates does not overlap with other threads work
+                {
+                    flaga=1;
+                }
+            }
+            
+        }
+        flaga=1;
+        cords[2*i]=a;
+        cords[2*i+1]=b;
+    }
+}
+
+void gen_each_thread(int *cords,unsigned long *seeds, int *num,int n)//generate cords for each thread (this ttime each thread works for itself)
+{
+    int a,b;
+    a=(int) randlin(&seeds[*num])%n;
+    b=(int) randlin(&seeds[*num])%n;
+    cords[2*(*num)]=a;
+    cords[2*(*num)+1]=b;
+}
 
 static PyObject *
-board_MC(board *self, PyObject *args) //single thread implementation of MC algo
+board_MC_para(board *self, PyObject *args)//parallel implementation of MC algo
 {
     int number_of_steps;
+    int cores;
     float T;
     float B;
-    if (!PyArg_ParseTuple(args,"iff",&number_of_steps,&T,&B)){return NULL;}
-    for (int i=0;i<number_of_steps;i++)
+    if (!PyArg_ParseTuple(args,"iffi",&number_of_steps,&T,&B,&cores)){return NULL;}
+    omp_set_num_threads(cores);
+    int cords[2*cores];
+    unsigned long seeds[cores];
+    set_seeds(seeds,cores);
+    #pragma omp parallel
     {
-        eval(self,T,B);   
+        int num=omp_get_thread_num();
+        unsigned long seed=1231231*num*num;
+        for (int i=0;i<number_of_steps/cores;i++)
+        {
+            
+            #pragma omp master
+            {
+                gen(cords,seeds,cores,self->n);
+            }
+            #pragma omp barrier
+            //gen_each_thread(cords,seeds,&num,self->n);
+            eval_para(self,T,B,num,&seed);   
+        }
     }
     return Py_None;
 }
+
 
 static PyObject *
 board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
@@ -181,11 +239,11 @@ static PyMethodDef board_methods[] = {
     {"mean", (PyCFunction) board_mean, METH_NOARGS,
      "calculate mean value in array"
     },
-    {"evolve",(PyCFunction) board_MC,METH_VARARGS,
-    "evolve the board with Metropolis-Hastings algorithm"},
     {"show",(PyCFunction) board_show, METH_NOARGS,
     "print the board"
     },
+    {"evolvep",(PyCFunction) board_MC_para,METH_VARARGS,
+    "evolve the board with Metropolis-Hastings algorithm(parallel version)"},
     {NULL}  
 };
 
@@ -206,13 +264,13 @@ static PyTypeObject BoardType = {
 
 static PyModuleDef isingmodule = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "Ising",
+    .m_name = "ParaIsing",
     .m_doc = "Ising 2D board MC simulator",
     .m_size = -1,
 };
 
 PyMODINIT_FUNC
-PyInit_Ising(void)
+PyInit_ParaIsing(void)
 {
     PyObject *m;
     if (PyType_Ready(&BoardType) < 0)
