@@ -201,6 +201,7 @@ board_MC_para(board *self, PyObject *args)
                 gen(cords,cores,self->n);
             }
             num=omp_get_thread_num();
+            #pragma omp barrier
             eval_para(self,T,B,cords,num);   
         }
     }
