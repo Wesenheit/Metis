@@ -6,12 +6,13 @@
 #include <math.h>
 #include <omp.h>
 #include "random.h"
-
+#include "utils.h"
+#include "checkboardI.h"
 typedef struct
 {
     PyObject_HEAD;
     int n;
-    int **tab;
+    char **tab;
 } board;
 
 static PyObject *
@@ -33,10 +34,10 @@ board_init(board *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"n",  NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,&self->n)) {return -1;}
     int n=self->n;
-    self->tab=(int **)malloc(n*sizeof(int*)); //allocating memory for table
+    self->tab=(char **)malloc(n*sizeof(char*)); //allocating memory for table
     for (int i=0;i<n;i++)
     {
-        self->tab[i]=(int *)malloc(n* sizeof(int));
+        self->tab[i]=(char *)malloc(n* sizeof(char));
     }
     for (int i=0;i<n;i++) //setting inital table state
     {   
@@ -45,11 +46,11 @@ board_init(board *self, PyObject *args, PyObject *kwds)
             int c=rand()%2;
             if (c==1)
             {
-                self->tab[i][j]=1;
+                self->tab[i][j]=2;
             }
             else
             {
-                self->tab[i][j]=-1;
+                self->tab[i][j]=0;
             }
         }
     }
@@ -65,94 +66,11 @@ board_mean(board *self, PyObject *Py_UNUSED(ignored))
     {
         for (int j=0;j<n;j++)
         {
-            wyn+=self->tab[i][j];
+            wyn+=self->tab[i][j]-1;
         }
     }
     double odp=wyn/(n*n);
     return PyFloat_FromDouble(odp);
-}
-int up (int x,int n) //upper spin with periodic boundary conditions
-{
-    if (x==n-1)
-    {
-        return 0;
-    }
-    else
-    {
-        return x+1;
-    }
-}
-int down (int x,int n) //lower spin with periodic boundary conditions
-{
-    if (x==0)
-    {
-        return n-1;
-    }
-    else
-    {
-        return x-1;
-    }
-}
-
-
-void eval_para(board *self,float T,float B,int num,unsigned long *seed)
-{
-    double c;
-    int a=randlin(seed)%self->n;
-    int b=randlin(seed)%self->n;
-    //a=cords[2*num]; //assigning cords to change
-    //b=cords[2*num+1];
-    double E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //same as in single thread
-    if (E<0)
-    {
-        self->tab[a][b]=-self->tab[a][b];
-        
-    }
-    else
-    {
-        //c=0;
-        c=rand()%10000/10000;
-        if (c>exp(-E/T))
-        {
-            self->tab[a][b]=-(self->tab[a][b]);
-            
-        }
-    }
-
-}
-void gen(int *cords,unsigned long *seeds,int cores,int n) //generate table with coordinates for each thread with one master thread
-{
-    int a,b;
-    int flaga=1;
-    for (int i=0;i<cores;i++)
-    {
-        while (flaga)
-        {
-            a=(int) randlin(&seeds[0])%n;
-            b=(int) randlin(&seeds[0])%n;
-            flaga=0;
-            for (int j=0;j<i;j++)
-            {
-                if (abs(cords[2*j]-a)<=1 || abs(cords[2*j]-a)==n-1 ||abs(cords[2*j+1]-b)==n-1 ||abs(cords[2*j+1]-b)<=1)//checking if change at given coordinates does not overlap with other threads work
-                {
-                    flaga=1;
-                }
-            }
-            
-        }
-        flaga=1;
-        cords[2*i]=a;
-        cords[2*i+1]=b;
-    }
-}
-
-void gen_each_thread(int *cords,unsigned long *seeds, int *num,int n)//generate cords for each thread (this ttime each thread works for itself)
-{
-    int a,b;
-    a=(int) randlin(&seeds[*num])%n;
-    b=(int) randlin(&seeds[*num])%n;
-    cords[2*(*num)]=a;
-    cords[2*(*num)+1]=b;
 }
 
 static PyObject *
@@ -160,28 +78,23 @@ board_MC_para(board *self, PyObject *args)//parallel implementation of MC algo
 {
     int number_of_steps;
     int cores;
+    int par;
     float T;
     float B;
-    if (!PyArg_ParseTuple(args,"iffi",&number_of_steps,&T,&B,&cores)){return NULL;}
+    if (!PyArg_ParseTuple(args,"iffii",&number_of_steps,&T,&B,&cores,&par)){return NULL;}
     omp_set_num_threads(cores);
-    int cords[2*cores];
-    unsigned long seeds[cores];
-    set_seeds(seeds,cores);
-    #pragma omp parallel
+    #pragma omp parallel for
+    for (int num=0;num<par*par;num++)
     {
-        int num=omp_get_thread_num();
-        unsigned long seed=1231231*num*num;
-        for (int i=0;i<number_of_steps/cores;i++)
-        {
-            
-            #pragma omp master
-            {
-                gen(cords,seeds,cores,self->n);
-            }
-            #pragma omp barrier
-            //gen_each_thread(cords,seeds,&num,self->n);
-            eval_para(self,T,B,num,&seed);   
-        }
+        unsigned long seed=omp_get_thread_num()*2131423*num;
+        ChessBoardI Chess;
+        allocateI(&Chess,self->n/par+2);
+        fillI(&Chess,self->tab,self->n,num,par);
+        evolveprand(&Chess,&seed,number_of_steps/(par*par),0,T,B);
+        updateinI(&Chess,self->tab,self->n,num,par);
+        upboundaries(&Chess,self->tab,self->n,num,par);
+        evolveprand(&Chess,&seed,number_of_steps/((self->n/par)*(self->n/par)),1,T,B);
+        dealocI(&Chess);
     }
     return Py_None;
 }
@@ -196,7 +109,7 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
         char tab[n+2];
         for (int j=0;j<n;j++)
         {
-            if (self->tab[i][j]==1)
+            if (self->tab[i][j]==2)
             {
                 tab[j]='u';
             }
@@ -286,6 +199,5 @@ PyInit_ParaIsing(void)
         Py_DECREF(m);
         return NULL;
     }
-    srand(time(NULL));
     return m;
 }
