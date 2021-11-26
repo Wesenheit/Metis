@@ -46,11 +46,11 @@ board_init(board *self, PyObject *args, PyObject *kwds)
             int c=rand()%2;
             if (c==1)
             {
-                self->tab[i][j]=2;
+                self->tab[i][j]=1;
             }
             else
             {
-                self->tab[i][j]=0;
+                self->tab[i][j]=-1;
             }
         }
     }
@@ -58,7 +58,7 @@ board_init(board *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-board_mean(board *self, PyObject *Py_UNUSED(ignored))
+board_mean_char(board *self, PyObject *Py_UNUSED(ignored))
 {
     double wyn=0;
     int n=self->n;
@@ -66,7 +66,7 @@ board_mean(board *self, PyObject *Py_UNUSED(ignored))
     {
         for (int j=0;j<n;j++)
         {
-            wyn+=self->tab[i][j]-1;
+            wyn+=self->tab[i][j];
         }
     }
     double odp=wyn/(n*n);
@@ -90,10 +90,16 @@ board_MC_para(board *self, PyObject *args)//parallel implementation of MC algo
         ChessBoardI Chess;
         allocateI(&Chess,self->n/par+2);
         fillI(&Chess,self->tab,self->n,num,par);
-        evolveprand(&Chess,&seed,number_of_steps/(par*par),0,T,B);
-        updateinI(&Chess,self->tab,self->n,num,par);
-        upboundaries(&Chess,self->tab,self->n,num,par);
-        evolveprand(&Chess,&seed,number_of_steps/((self->n/par)*(self->n/par)),1,T,B);
+        int iters_per_square=(self->n/par)*(self->n/par)/4;
+        for (int j=0;j<number_of_steps/(iters_per_square*par*par);j++)
+        {
+            evolveprand(&Chess,&seed,iters_per_square,0,T,B);
+            //updateinI(&Chess,self->tab,self->n,num,par);
+            //upboundaries(&Chess,self->tab,self->n,num,par);
+            evolveprand(&Chess,&seed,iters_per_square,1,T,B);
+            updateinI(&Chess,self->tab,self->n,num,par);
+            upboundaries(&Chess,self->tab,self->n,num,par);
+        }
         dealocI(&Chess);
     }
     return Py_None;
@@ -109,7 +115,7 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
         char tab[n+2];
         for (int j=0;j<n;j++)
         {
-            if (self->tab[i][j]==2)
+            if (self->tab[i][j]==1)
             {
                 tab[j]='u';
             }
@@ -149,7 +155,7 @@ static PyMemberDef board_members[] = {
 };
 
 static PyMethodDef board_methods[] = {
-    {"mean", (PyCFunction) board_mean, METH_NOARGS,
+    {"mean", (PyCFunction) board_mean_char, METH_NOARGS,
      "calculate mean value in array"
     },
     {"show",(PyCFunction) board_show, METH_NOARGS,
@@ -199,5 +205,6 @@ PyInit_ParaIsing(void)
         Py_DECREF(m);
         return NULL;
     }
+    srand(time(NULL));
     return m;
 }

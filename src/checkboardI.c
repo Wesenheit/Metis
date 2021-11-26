@@ -80,17 +80,17 @@ void evolveprand(ChessBoardI *chess,unsigned long *seed,int steps,int parity,flo
 {
     for (int i=0;i<steps;i++)
     {
-        int a=(randlin(seed)%(chess->size-2))/2+1+parity;
-        int b=(randlin(seed)%(chess->size-2))/2+1+parity;
-        double E=2*(chess->board[a][b]-1)*2*(B+chess->board[a+1][b]+chess->board[a-1][b]+chess->board[a][b-1]+chess->board[a][b+1]-4); //calculating change in energy
+        int a=(randlin(seed)%(chess->size-2))+1;
+        int b=(randlin(seed)%(chess->size-2))+1;
+        float E=2*(chess->board[a][b])*(B+chess->board[a+1][b]+chess->board[a-1][b]+chess->board[a][b-1]+chess->board[a][b+1]); //calculating change in energy
         if (E<0) //if energy is smaller just accept...
         {
             chess->board[a][b]=-chess->board[a][b];
         }
         else //else accept with given propability
         {
-            double c=randlin(seed)%1000000/1000000;
-            if (c>exp(-E/T))
+            float c=(randlin(seed)%1000000)/1000000;
+            if (c<expf(-E/T))
             {
                 chess->board[a][b]=-(chess->board[a][b]);
             }

@@ -99,15 +99,15 @@ void eval(board *self,float T,float B)
     int a,b;
     a=rand()%(self->n);
     b=rand()%(self->n);
-    double E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
+    float E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
         self->tab[a][b]=-self->tab[a][b];
     }
     else //else accept with given propability
     {
-        double c=rand()%10000/10000;
-        if (c>exp(-E/T))
+        float c=rand()%10000000/10000000;
+        if (c<expf(-E/T))
         {
             self->tab[a][b]=-(self->tab[a][b]);
         }
