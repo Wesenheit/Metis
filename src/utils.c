@@ -1,5 +1,3 @@
-
-
 int up (int x,int n) //upper spin with periodic boundary conditions
 {
     if (x==n-1)

@@ -5,12 +5,13 @@
 #include <stdlib.h>
 #include <math.h>
 #include "random.h"
+#include "utils.h"
 
 typedef struct
 {
     PyObject_HEAD;
     int n;
-    int **tab;
+    char **tab;
 } board;
 
 static PyObject *
@@ -32,10 +33,10 @@ board_init(board *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"n",  NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,&self->n)) {return -1;}
     int n=self->n;
-    self->tab=(int **)malloc(n*sizeof(int*)); //allocating memory for table
+    self->tab=(char **)malloc(n*sizeof(char*)); //allocating memory for table
     for (int i=0;i<n;i++)
     {
-        self->tab[i]=(int *)malloc(n* sizeof(int));
+        self->tab[i]=(char *)malloc(n* sizeof(char));
     }
     for (int i=0;i<n;i++) //setting inital table state
     {   
@@ -70,36 +71,12 @@ board_mean(board *self, PyObject *Py_UNUSED(ignored))
     double odp=wyn/(n*n);
     return PyFloat_FromDouble(odp);
 }
-int up (int x,int n) //upper spin with periodic boundary conditions
-{
-    if (x==n-1)
-    {
-        return 0;
-    }
-    else
-    {
-        return x+1;
-    }
-}
-int down (int x,int n) //lower spin with periodic boundary conditions
-{
-    if (x==0)
-    {
-        return n-1;
-    }
-    else
-    {
-        return x-1;
-    }
-}
-
-
 void eval(board *self,float T,float B)
 {
     int a,b;
     a=rand()%(self->n);
     b=rand()%(self->n);
-    float E=2*self->tab[a][b]*2*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
+    float E=2*self->tab[a][b]*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
         self->tab[a][b]=-self->tab[a][b];
@@ -115,8 +92,28 @@ void eval(board *self,float T,float B)
 
 }
 
+void eval_stat(board *self,float T,float B)
+{
+    int a,b;
+    a=rand()%(self->n-2)+1;
+    b=rand()%(self->n-2)+1;
+    float E=2*self->tab[a][b]*(B+self->tab[a][b-1]+self->tab[a-1][b]+self->tab[a+1][b]+self->tab[a][b+1]); //calculating change in energy
+    if (E<0) //if energy is smaller just accept...
+    {
+        self->tab[a][b]=-self->tab[a][b];
+    }
+    else //else accept with given propability
+    {
+        float c=rand()%10000000/10000000;
+        if (c<expf(-E/T))
+        {
+            self->tab[a][b]=-(self->tab[a][b]);
+        }
+    }
+}
+
 static PyObject *
-board_MC(board *self, PyObject *args) //single thread implementation of MC algo
+board_MC_periodic(board *self, PyObject *args) //single thread implementation of MC algo
 {
     int number_of_steps;
     float T;
@@ -128,6 +125,29 @@ board_MC(board *self, PyObject *args) //single thread implementation of MC algo
     }
     return Py_None;
 }
+
+static PyObject *
+board_MC_static(board *self, PyObject *args) //single thread implementation of MC algo
+{
+    int number_of_steps;
+    float T;
+    float B;
+    if (!PyArg_ParseTuple(args,"iff",&number_of_steps,&T,&B)){return NULL;}
+    for (int i = 0; i < self->n; i++)
+    {
+        self->tab[i][self->n-1]=1;
+        self->tab[i][0]=1;
+        self->tab[self->n-1][i]=1;
+        self->tab[0][i]=1;
+    }
+    
+    for (int i=0;i<number_of_steps;i++)
+    {
+        eval_stat(self,T,B);   
+    }
+    return Py_None;
+}
+
 
 static PyObject *
 board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
@@ -181,8 +201,10 @@ static PyMethodDef board_methods[] = {
     {"mean", (PyCFunction) board_mean, METH_NOARGS,
      "calculate mean value in array"
     },
-    {"evolve",(PyCFunction) board_MC,METH_VARARGS,
-    "evolve the board with Metropolis-Hastings algorithm"},
+    {"evolve_per",(PyCFunction) board_MC_periodic,METH_VARARGS,
+    "evolve the board with Metropolis-Hastings algorithm(periodic boundary conditions)"},
+    {"evolve_sta",(PyCFunction) board_MC_static,METH_VARARGS,
+    "evolve the board with Metropolis-Hastings algorithm(static boundary conditions)"},
     {"show",(PyCFunction) board_show, METH_NOARGS,
     "print the board"
     },
