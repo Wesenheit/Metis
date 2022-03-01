@@ -3,6 +3,7 @@
 #include "stdlib.h"
 #include "math.h"
 #include "random.h"
+#include <stdio.h>
 typedef struct ChessBoardI
 {
     char **board;
@@ -82,15 +83,15 @@ void evolveprand(ChessBoardI *chess,unsigned long *seed,int steps,int parity,flo
     {
         int a=(randlin(seed)%(chess->size-2))+1;
         int b=(randlin(seed)%(chess->size-2))+1;
-        float E=2*(chess->board[a][b])*(B+chess->board[a+1][b]+chess->board[a-1][b]+chess->board[a][b-1]+chess->board[a][b+1]); //calculating change in energy
+        double E=2*(chess->board[a][b])*(B+chess->board[a+1][b]+chess->board[a-1][b]+chess->board[a][b-1]+chess->board[a][b+1]); //calculating change in energy
         if (E<0) //if energy is smaller just accept...
         {
             chess->board[a][b]=-chess->board[a][b];
         }
         else //else accept with given propability
         {
-            float c=(randlin(seed)%1000000)/1000000;
-            if (c<expf(-E/T))
+            double c=(double)rand()/(double)RAND_MAX;
+            if (c<exp(-E/T))
             {
                 chess->board[a][b]=-(chess->board[a][b]);
             }

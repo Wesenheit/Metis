@@ -97,8 +97,8 @@ board_MC_para(board *self, PyObject *args)//parallel implementation of MC algo
             //updateinI(&Chess,self->tab,self->n,num,par);
             //upboundaries(&Chess,self->tab,self->n,num,par);
             evolveprand(&Chess,&seed,iters_per_square,1,T,B);
-            updateinI(&Chess,self->tab,self->n,num,par);
-            upboundaries(&Chess,self->tab,self->n,num,par);
+            //updateinI(&Chess,self->tab,self->n,num,par);
+            //upboundaries(&Chess,self->tab,self->n,num,par);
         }
         dealocI(&Chess);
     }

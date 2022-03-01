@@ -7,6 +7,8 @@
 #include "random.h"
 #include "utils.h"
 
+#define RANDMAX 10000000
+
 typedef struct
 {
     PyObject_HEAD;
@@ -76,15 +78,15 @@ void eval(board *self,float T,float B)
     int a,b;
     a=rand()%(self->n);
     b=rand()%(self->n);
-    float E=2*self->tab[a][b]*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
+    double E=2*self->tab[a][b]*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
         self->tab[a][b]=-self->tab[a][b];
     }
     else //else accept with given propability
     {
-        float c=rand()%10000000/10000000;
-        if (c<expf(-E/T))
+        double c=(double)rand()/(double)RAND_MAX;
+        if (c<exp(-E/T))
         {
             self->tab[a][b]=-(self->tab[a][b]);
         }
@@ -97,15 +99,15 @@ void eval_stat(board *self,float T,float B)
     int a,b;
     a=rand()%(self->n-2)+1;
     b=rand()%(self->n-2)+1;
-    float E=2*self->tab[a][b]*(B+self->tab[a][b-1]+self->tab[a-1][b]+self->tab[a+1][b]+self->tab[a][b+1]); //calculating change in energy
+    double E=2*self->tab[a][b]*(B+self->tab[a][b-1]+self->tab[a-1][b]+self->tab[a+1][b]+self->tab[a][b+1]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
         self->tab[a][b]=-self->tab[a][b];
     }
     else //else accept with given propability
     {
-        float c=rand()%10000000/10000000;
-        if (c<expf(-E/T))
+        double c=(double)rand()/(double)RAND_MAX;
+        if (c<exp(-E/T))
         {
             self->tab[a][b]=-(self->tab[a][b]);
         }
