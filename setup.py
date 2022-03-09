@@ -1,4 +1,4 @@
-from distutils.core import setup, Extension
+from setuptools import setup,Extension
 
 parallel=["-fopenmp","-std=c11","-march=native"]
 parallel_links=['-lgomp']

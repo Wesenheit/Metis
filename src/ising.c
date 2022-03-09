@@ -180,6 +180,31 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
     return Py_None;
 }
 
+static PyObject*
+board_flatten(board *self)
+{
+    int n=self->n;
+    char tab[n*n+1];
+    for (int i=0;i<n;i++)
+    {
+        for (int j=0;j<n;j++)
+        {
+            if(self->tab[i][j]==-1)
+            {
+                tab[i*n+j]='0';
+            }
+            else
+            {
+                tab[i*n+j]='1';
+            }
+        }
+    }
+    tab[n*n]='\0';
+    const char * wyn=tab;
+    PyObject *str=PyUnicode_FromString(wyn);
+    return str;
+}
+
 static void
 board_dealloc(board *self)
 {
@@ -210,6 +235,8 @@ static PyMethodDef board_methods[] = {
     {"show",(PyCFunction) board_show, METH_NOARGS,
     "print the board"
     },
+    {"flatten",(PyCFunction) board_flatten,METH_NOARGS,
+    "flatten board"},
     {NULL}  
 };
 
