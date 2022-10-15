@@ -32,8 +32,9 @@ board_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 board_init(board *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"n",  NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,&self->n)) {return -1;}
+    static char *kwlist[] = {"n",  "fill",NULL};
+    int fill_with_ones;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwlist,&self->n,&fill_with_ones)) {return -1;}
     int n=self->n;
     self->tab=(char **)malloc(n*sizeof(char*)); //allocating memory for table
     for (int i=0;i<n;i++)
@@ -44,7 +45,15 @@ board_init(board *self, PyObject *args, PyObject *kwds)
     {   
         for (int j=0;j<n;j++)   
         {
-            int c=rand()%2;
+            int c;
+            if (fill_with_ones)
+            {
+                c=rand()&2;
+            }
+            else
+            {
+                c=1;
+            }
             if (c==1)
             {
                 self->tab[i][j]=1;
@@ -117,24 +126,25 @@ void eval_stat(board *self,float T,float B)
 static PyObject *
 board_MC_periodic(board *self, PyObject *args) //single thread implementation of MC algo
 {
-    int number_of_steps;
+    long number_of_steps;
     float T;
     float B;
-    if (!PyArg_ParseTuple(args,"iff",&number_of_steps,&T,&B)){return NULL;}
-    for (int i=0;i<number_of_steps;i++)
+    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
+    for (long i=0;i<number_of_steps;i++)
     {
         eval(self,T,B);   
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
 static PyObject *
 board_MC_static(board *self, PyObject *args) //single thread implementation of MC algo
 {
-    int number_of_steps;
+    long number_of_steps;
     float T;
     float B;
-    if (!PyArg_ParseTuple(args,"iff",&number_of_steps,&T,&B)){return NULL;}
+    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
     for (int i = 0; i < self->n; i++)
     {
         self->tab[i][self->n-1]=1;
@@ -143,10 +153,11 @@ board_MC_static(board *self, PyObject *args) //single thread implementation of M
         self->tab[0][i]=1;
     }
     
-    for (int i=0;i<number_of_steps;i++)
+    for (long i=0;i<number_of_steps;i++)
     {
         eval_stat(self,T,B);   
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 
@@ -177,6 +188,7 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
         //free(str);
         //Py_DECREF(str);
     }
+    Py_INCREF(Py_None);
     return Py_None;
 }
 

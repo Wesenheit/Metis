@@ -1,24 +1,26 @@
 import Ising
 import numpy as np
 from matplotlib import pyplot as plt
-n=15
-k=30
-T=np.linspace(0.0001,4,100)
+import time
+start=time.time()
+n=1500
+k=100
+T=np.linspace(0.0001,4,50)
 m=[]
-def mean(lista):
-    wyn=0
-    for a in lista:
-        wyn+=a/len(lista)
-    return wyn
-
+p=Ising.Board(n,1)
+print("burnout")
+p.evolve_per(10**11,0.001,0)
+print("evolution")
 for t in T:
     print(t)
-    temp=[]
-    for _ in range(k):
-        p=Ising.Board(n)
-        p.evolve_per(10**6,t,0)
-        temp.append(abs(p.mean()))
-    m.append(mean(temp))
+    temp=np.zeros(k)
+    p.evolve_per(10**8,t,0)
+    for i in range(k):
+        p.evolve_per(10**7,t,0)
+        temp[i]=(abs(p.mean()))
+    m.append(np.mean(temp))
+end=time.time()
+print("time:",end-start)
 plt.plot(T,m)
 plt.show()
 
