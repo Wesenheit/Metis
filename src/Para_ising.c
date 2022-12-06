@@ -1,18 +1,17 @@
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>
+#include <Python.h>int_fast8_t
 #include "structmember.h"
 #include <time.h>
 #include <stdlib.h>
 #include <math.h>
 #include <omp.h>
-#include "random.h"
 #include "utils.h"
 #include "checkboardI.h"
 typedef struct
 {
     PyObject_HEAD;
     int n;
-    char **tab;
+    int_fast8_t *tab;
 } board;
 
 static PyObject *
@@ -34,11 +33,7 @@ board_init(board *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"n",  NULL};
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "i", kwlist,&self->n)) {return -1;}
     int n=self->n;
-    self->tab=(char **)malloc(n*sizeof(char*)); //allocating memory for table
-    for (int i=0;i<n;i++)
-    {
-        self->tab[i]=(char *)malloc(n* sizeof(char));
-    }
+    self->tab=(int_fast8_t *)malloc(n*sizeof(int_fast8_t)); //allocating memory for table
     for (int i=0;i<n;i++) //setting inital table state
     {   
         for (int j=0;j<n;j++)   
@@ -46,11 +41,11 @@ board_init(board *self, PyObject *args, PyObject *kwds)
             int c=rand()%2;
             if (c==1)
             {
-                self->tab[i][j]=1;
+                self->tab[i*n+j]=1;
             }
             else
             {
-                self->tab[i][j]=-1;
+                self->tab[i*n+j]=-1;
             }
         }
     }
@@ -66,7 +61,7 @@ board_mean_char(board *self, PyObject *Py_UNUSED(ignored))
     {
         for (int j=0;j<n;j++)
         {
-            wyn+=self->tab[i][j];
+            wyn+=self->tab[i*n+j];
         }
     }
     double odp=wyn/(n*n);
@@ -115,7 +110,7 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
         char tab[n+2];
         for (int j=0;j<n;j++)
         {
-            if (self->tab[i][j]==1)
+            if (self->tab[i*n+j]==1)
             {
                 tab[j]='u';
             }
@@ -144,7 +139,7 @@ board_flatten(board *self)
     {
         for (int j=0;j<n;j++)
         {
-            if(self->tab[i][j]==-1)
+            if(self->tab[i*n+j]==-1)
             {
                 tab[i*n+j]='0';
             }
@@ -163,11 +158,6 @@ board_flatten(board *self)
 static void
 board_dealloc(board *self)
 {
-    int n=self->n;
-    for (int i=0;i<n;i++)
-    {
-        free(self->tab[i]);
-    }
     free(self->tab);
     Py_TYPE(self)->tp_free((PyObject *) self);
 }

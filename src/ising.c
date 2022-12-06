@@ -3,6 +3,7 @@
 #include "structmember.h"
 #include <time.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include "random.h"
 #include "utils.h"
@@ -13,7 +14,7 @@ typedef struct
 {
     PyObject_HEAD;
     int n;
-    char **tab;
+    int_fast8_t *tab;
 } board;
 
 static PyObject *
@@ -36,11 +37,7 @@ board_init(board *self, PyObject *args, PyObject *kwds)
     int fill_with_ones;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwlist,&self->n,&fill_with_ones)) {return -1;}
     int n=self->n;
-    self->tab=(char **)malloc(n*sizeof(char*)); //allocating memory for table
-    for (int i=0;i<n;i++)
-    {
-        self->tab[i]=(char *)malloc(n* sizeof(char));
-    }
+    self->tab=(int_fast8_t *)malloc(n*n*sizeof(int_fast8_t*)); //allocating memory for table
     for (int i=0;i<n;i++) //setting inital table state
     {   
         for (int j=0;j<n;j++)   
@@ -56,11 +53,11 @@ board_init(board *self, PyObject *args, PyObject *kwds)
             }
             if (c==1)
             {
-                self->tab[i][j]=1;
+                self->tab[i*n+j]=1;
             }
             else
             {
-                self->tab[i][j]=-1;
+                self->tab[i*n+j]=-1;
             }
         }
     }
@@ -76,7 +73,7 @@ board_mean(board *self, PyObject *Py_UNUSED(ignored))
     {
         for (int j=0;j<n;j++)
         {
-            wyn+=self->tab[i][j];
+            wyn+=self->tab[i*n+j];
         }
     }
     double odp=wyn/(n*n);
@@ -87,17 +84,18 @@ void eval(board *self,float T,float B)
     int a,b;
     a=rand()%(self->n);
     b=rand()%(self->n);
-    double E=2*self->tab[a][b]*(B+self->tab[a][down(b,self->n)]+self->tab[down(a,self->n)][b]+self->tab[up(a,self->n)][b]+self->tab[a][up(b,self->n)]); //calculating change in energy
+    int n=self->n;
+    double E=2*self->tab[a*n+b]*(B+self->tab[a*n+down(b,self->n)]+self->tab[down(a,self->n)*n+b]+self->tab[up(a,self->n)*n+b]+self->tab[a*n+up(b,self->n)]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
-        self->tab[a][b]=-self->tab[a][b];
+        self->tab[a*n+b]=-self->tab[a*n+b];
     }
     else //else accept with given propability
     {
         double c=(double)rand()/(double)RAND_MAX;
         if (c<exp(-E/T))
         {
-            self->tab[a][b]=-(self->tab[a][b]);
+            self->tab[a*n+b]=-(self->tab[a*n+b]);
         }
     }
 
@@ -108,17 +106,18 @@ void eval_stat(board *self,float T,float B)
     int a,b;
     a=rand()%(self->n-2)+1;
     b=rand()%(self->n-2)+1;
-    double E=2*self->tab[a][b]*(B+self->tab[a][b-1]+self->tab[a-1][b]+self->tab[a+1][b]+self->tab[a][b+1]); //calculating change in energy
+    int n=self->n;
+    double E=2*self->tab[a*n+b]*(B+self->tab[a*n+b-1]+self->tab[(a-1)*n+b]+self->tab[(a+1)*n+b]+self->tab[a*n+b+1]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
-        self->tab[a][b]=-self->tab[a][b];
+        self->tab[a*n+b]=-self->tab[a*n+b];
     }
     else //else accept with given propability
     {
         double c=(double)rand()/(double)RAND_MAX;
         if (c<exp(-E/T))
         {
-            self->tab[a][b]=-(self->tab[a][b]);
+            self->tab[a*n+b]=-(self->tab[a*n+b]);
         }
     }
 }
@@ -144,13 +143,14 @@ board_MC_static(board *self, PyObject *args) //single thread implementation of M
     long number_of_steps;
     float T;
     float B;
+    int n=self->n;
     if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
     for (int i = 0; i < self->n; i++)
     {
-        self->tab[i][self->n-1]=1;
-        self->tab[i][0]=1;
-        self->tab[self->n-1][i]=1;
-        self->tab[0][i]=1;
+        self->tab[i*n+n-1]=1;
+        self->tab[i*n+0]=1;
+        self->tab[n*(n-1)+i]=1;
+        self->tab[i]=1;
     }
     
     for (long i=0;i<number_of_steps;i++)
@@ -171,7 +171,7 @@ board_show(board *self, PyObject *Py_UNUSED(ignored))//print board state
         char tab[n+2];
         for (int j=0;j<n;j++)
         {
-            if (self->tab[i][j]==1)
+            if (self->tab[i*n+j]==1)
             {
                 tab[j]='u';
             }
@@ -201,7 +201,7 @@ board_flatten(board *self)
     {
         for (int j=0;j<n;j++)
         {
-            if(self->tab[i][j]==-1)
+            if(self->tab[i*n+j]==-1)
             {
                 tab[i*n+j]='0';
             }
@@ -220,11 +220,7 @@ board_flatten(board *self)
 static void
 board_dealloc(board *self)
 {
-    int n=self->n;
-    for (int i=0;i<n;i++)
-    {
-        free(self->tab[i]);
-    }
+
     free(self->tab);
     Py_TYPE(self)->tp_free((PyObject *) self);
 }
