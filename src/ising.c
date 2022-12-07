@@ -85,7 +85,7 @@ void eval(board *self,float T,float B)
     a=rand()%(self->n);
     b=rand()%(self->n);
     int n=self->n;
-    double E=2*self->tab[a*n+b]*(B+self->tab[a*n+down(b,self->n)]+self->tab[down(a,self->n)*n+b]+self->tab[up(a,self->n)*n+b]+self->tab[a*n+up(b,self->n)]); //calculating change in energy
+    double E=2*self->tab[a*n+b]*(B+self->tab[a*n+down(b,n)]+self->tab[down(a,n)*n+b]+self->tab[up(a,n)*n+b]+self->tab[a*n+up(b,n)]); //calculating change in energy
     if (E<0) //if energy is smaller just accept...
     {
         self->tab[a*n+b]=-self->tab[a*n+b];
@@ -93,7 +93,29 @@ void eval(board *self,float T,float B)
     else //else accept with given propability
     {
         double c=(double)rand()/(double)RAND_MAX;
-        if (c<exp(-E/T))
+        if (c<1-E/T)
+        {
+            self->tab[a*n+b]=-(self->tab[a*n+b]);
+        }
+    }
+
+}
+
+void eval_fast(board *self,float T,float B,float mul_factor,float* precomp)
+{
+    int a,b;
+    a=rand()%(self->n);
+    b=rand()%(self->n);
+    int n=self->n;
+    int_fast8_t E=self->tab[a*n+b]*(self->tab[a*n+down(b,n)]+self->tab[down(a,n)*n+b]+self->tab[up(a,n)*n+b]+self->tab[a*n+up(b,n)]); //calculating change in energy
+    if (E<0) //if energy is smaller just accept...
+    {
+        self->tab[a*n+b]=-self->tab[a*n+b];
+    }
+    else //else accept with given propability
+    {
+        double c=(double)rand()/(double)RAND_MAX;
+        if (c<precomp[E]*mul_factor)
         {
             self->tab[a*n+b]=-(self->tab[a*n+b]);
         }
@@ -136,6 +158,29 @@ board_MC_periodic(board *self, PyObject *args) //single thread implementation of
     Py_INCREF(Py_None);
     return Py_None;
 }
+
+static PyObject *
+board_MC_periodic_fast(board *self, PyObject *args) //single thread implementation of MC algo
+{
+    long number_of_steps;
+    float T;
+    float B;
+    float mul_factor=expf(-2*B/T);
+    float* precomp=malloc(8*sizeof(float));
+    for (int i=0;i<8;i++)
+    {
+        precomp[i]=expf(-((float)i)*2/T);
+    }
+    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
+    for (long i=0;i<number_of_steps;i++)
+    {
+        eval_fast(self,T,B,mul_factor,precomp);   
+    }
+    free(precomp);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 
 static PyObject *
 board_MC_static(board *self, PyObject *args) //single thread implementation of MC algo
@@ -245,6 +290,8 @@ static PyMethodDef board_methods[] = {
     },
     {"flatten",(PyCFunction) board_flatten,METH_NOARGS,
     "flatten board"},
+    {"evolve_per_fast",(PyCFunction) board_MC_periodic_fast,METH_VARARGS,
+    "DOES NOT WORK WITH MAGNETIC FIELD, evolve the board with fast Metropolis-Hastings algorithm (periodic boundary conditions)"},
     {NULL}  
 };
 

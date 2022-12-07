@@ -1,0 +1,11 @@
+README.md
+setup.py
+Metis.egg-info/PKG-INFO
+Metis.egg-info/SOURCES.txt
+Metis.egg-info/dependency_links.txt
+Metis.egg-info/top_level.txt
+src/Para_ising.c
+src/checkboardI.c
+src/ising.c
+test/test_double.py
+test/test_single.py
