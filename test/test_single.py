@@ -10,16 +10,16 @@ n=1500
 k=100
 T=np.linspace(0.0001,4,50)
 m=[]
-p=Ising.Board(n,1)
+p=Ising.Board(n,True)
 print("burnout")
-p.evolve_per_fast(10**8,0.001,0)
+p.evolve_heath_bath_fast(10**8,0.001,0)
 print("evolution")
 for t in T:
     print(t)
     temp=np.zeros(k)
-    p.evolve_per_fast(10**6,t,0)
+    p.evolve_heath_bath_fast(10**6,t,0)
     for i in range(k):
-        p.evolve_per_fast(10**6,t,0)
+        p.evolve_heath_bath_fast(10**6,t,0)
         temp[i]=(abs(p.mean()))
     m.append(np.mean(temp))
 end=time.time()

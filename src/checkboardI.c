@@ -8,12 +8,7 @@
 
 void allocateI(ChessBoardI *b, int s)
 {
-    b->board=(int_fast8_t**)malloc(s*sizeof(int_fast8_t*));
-    b->size=s;
-    for (int i=0;i<s;i++)
-    {
-        b->board[i]=(int_fast8_t*)malloc(s*sizeof(int_fast8_t*));
-    }
+    b->board=(int_fast8_t*)malloc(s*s*sizeof(int_fast8_t));
 }
 
 void fillI(ChessBoardI *a, int_fast8_t *tab, int n, int num, int p)
@@ -65,7 +60,7 @@ void upboundariesreversed(ChessBoardI *a, int_fast8_t *tab, int n, int num, int 
     int startx=(num%p)*n/p;
     for (int i=1;i<a->size-1;i++)
     {
-        tab[startx*a->size+ip(starty,n)]=a->board[i*a->size];
+        tab[startx*a->size+up(starty,n)]=a->board[i*a->size];
         tab[startx*a->size+down(starty,n)]=a->board[i*a->size + a->size-1];
         tab[up(startx,n)*a->size+starty]=a->board[i];
         tab[down(startx,n)*a->size+starty]=a->board[(a->size-1)*a->size+i];

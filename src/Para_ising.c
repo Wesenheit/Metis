@@ -1,5 +1,5 @@
 #define PY_SSIZE_T_CLEAN
-#include <Python.h>int_fast8_t
+#include <Python.h>
 #include "structmember.h"
 #include <time.h>
 #include <stdlib.h>
@@ -7,6 +7,7 @@
 #include <omp.h>
 #include "utils.h"
 #include "checkboardI.h"
+
 typedef struct
 {
     PyObject_HEAD;
@@ -89,14 +90,15 @@ board_MC_para(board *self, PyObject *args)//parallel implementation of MC algo
         for (int j=0;j<number_of_steps/(iters_per_square*par*par);j++)
         {
             evolveprand(&Chess,&seed,iters_per_square,0,T,B);
-            //updateinI(&Chess,self->tab,self->n,num,par);
-            //upboundaries(&Chess,self->tab,self->n,num,par);
+            updateinI(&Chess,self->tab,self->n,num,par);
+            upboundaries(&Chess,self->tab,self->n,num,par);
             evolveprand(&Chess,&seed,iters_per_square,1,T,B);
-            //updateinI(&Chess,self->tab,self->n,num,par);
-            //upboundaries(&Chess,self->tab,self->n,num,par);
+            updateinI(&Chess,self->tab,self->n,num,par);
+            upboundaries(&Chess,self->tab,self->n,num,par);
         }
         dealocI(&Chess);
     }
+
     return Py_None;
 }
 

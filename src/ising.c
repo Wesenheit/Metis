@@ -33,32 +33,32 @@ board_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 board_init(board *self, PyObject *args, PyObject *kwds)
 {
+    int n;
+    int fill;
     static char *kwlist[] = {"n",  "fill",NULL};
-    int fill_with_ones;
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwlist,&self->n,&fill_with_ones)) {return -1;}
-    int n=self->n;
-    self->tab=(int_fast8_t *)malloc(n*n*sizeof(int_fast8_t*)); //allocating memory for table
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwlist,&n,&fill)) {return -1;}
+    self->tab=(int_fast8_t *)malloc(n*n*sizeof(int_fast8_t)); //allocating memory for table
+    self->n=n;
     for (int i=0;i<n;i++) //setting inital table state
     {   
         for (int j=0;j<n;j++)   
         {
-            int c;
-            if (fill_with_ones)
-            {
-                c=rand()&2;
-            }
-            else
-            {
-                c=1;
-            }
-            if (c==1)
+            if (fill)
             {
                 self->tab[i*n+j]=1;
             }
             else
             {
-                self->tab[i*n+j]=-1;
+                if (rand() % 2)
+                {
+                    self->tab[i*n+j]=1;
+                }
+                else
+                {
+                    self->tab[i*n+j]=-1;
+                }
             }
+
         }
     }
     return 0;
@@ -79,6 +79,21 @@ board_mean(board *self, PyObject *Py_UNUSED(ignored))
     double odp=wyn/(n*n);
     return PyFloat_FromDouble(odp);
 }
+static PyObject *
+board_energy(board *self,PyObject *Py_UNUSED(ignored))
+{
+    double energy=0;
+    int n=self->n;
+    for (int a=0;a<n;a++)
+    {
+        for (int b=0;b<n;b++)
+        {
+            energy+=self->tab[a*n+b]*(self->tab[a*n+down(b,n)]+self->tab[down(a,n)*n+b]+self->tab[up(a,n)*n+b]+self->tab[a*n+up(b,n)]);
+        }
+    }
+    return PyFloat_FromDouble(energy/2);
+}
+
 void eval(board *self,float T,float B)
 {
     int a,b;
@@ -93,13 +108,50 @@ void eval(board *self,float T,float B)
     else //else accept with given propability
     {
         double c=(double)rand()/(double)RAND_MAX;
-        if (c<1-E/T)
+        if (c<exp(-E/T))
         {
             self->tab[a*n+b]=-(self->tab[a*n+b]);
         }
     }
 
 }
+
+void eval_heat_bath(board *self,float T,float B)
+{
+    int a,b;
+    a=rand()%(self->n);
+    b=rand()%(self->n);
+    int n=self->n;
+    double E=2*(B+self->tab[a*n+down(b,n)]+self->tab[down(a,n)*n+b]+self->tab[up(a,n)*n+b]+self->tab[a*n+up(b,n)]); //calculating change in energy
+    double c=(double)rand()/(double)RAND_MAX;
+    if (c<1/(1+exp(-E/T)))
+    {
+        self->tab[a*n+b]=1;
+    }
+    else
+    {
+        self->tab[a*n+b]=-1;
+    }
+}
+
+void eval_heat_bath_fast(board *self,float T,float B,float mul_factor,float *precomp)
+{
+    int a,b;
+    a=rand()%(self->n);
+    b=rand()%(self->n);
+    int n=self->n;
+    int_fast8_t E=(self->tab[a*n+down(b,n)]+self->tab[down(a,n)*n+b]+self->tab[up(a,n)*n+b]+self->tab[a*n+up(b,n)]); //calculating change in energy
+    double c=(double)rand()/(double)RAND_MAX;
+    if (1/(c+0.00001)-1>precomp[E+4]*mul_factor)
+    {
+        self->tab[a*n+b]=1;
+    }
+    else
+    {
+        self->tab[a*n+b]=-1;
+    }
+}
+
 
 void eval_fast(board *self,float T,float B,float mul_factor,float* precomp)
 {
@@ -114,7 +166,8 @@ void eval_fast(board *self,float T,float B,float mul_factor,float* precomp)
     }
     else //else accept with given propability
     {
-        double c=(double)rand()/(double)RAND_MAX;
+        //double c=(double)wyhash64()/(double)UINT64_MAX;
+        double c=(double) rand()/(double)RAND_MAX;
         if (c<precomp[E]*mul_factor)
         {
             self->tab[a*n+b]=-(self->tab[a*n+b]);
@@ -160,18 +213,55 @@ board_MC_periodic(board *self, PyObject *args) //single thread implementation of
 }
 
 static PyObject *
+board_heath_bath_periodic(board *self, PyObject *args) //single thread implementation of MC algo
+{
+    long number_of_steps;
+    float T;
+    float B;
+    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
+    for (long i=0;i<number_of_steps;i++)
+    {
+        eval_heat_bath(self,T,B);   
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *
+board_heath_bath_periodic_fast(board *self, PyObject *args) //single thread implementation of MC algo
+{
+    long number_of_steps;
+    float T;
+    float B;
+    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
+    float mul_factor=expf(-2*B/T);
+    float* precomp=malloc(9*sizeof(float));
+    for (int i=0;i<9;i++)
+    {
+        precomp[i]=expf(-((float) i-4.)*2/T);
+    }
+    for (long i=0;i<number_of_steps;i++)
+    {
+        eval_heat_bath_fast(self,T,B,mul_factor,precomp);   
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+
+static PyObject *
 board_MC_periodic_fast(board *self, PyObject *args) //single thread implementation of MC algo
 {
     long number_of_steps;
     float T;
     float B;
+    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
     float mul_factor=expf(-2*B/T);
-    float* precomp=malloc(8*sizeof(float));
-    for (int i=0;i<8;i++)
+    float* precomp=malloc(5*sizeof(float));
+    for (int i=0;i<5;i++)
     {
         precomp[i]=expf(-((float)i)*2/T);
     }
-    if (!PyArg_ParseTuple(args,"lff",&number_of_steps,&T,&B)){return NULL;}
     for (long i=0;i<number_of_steps;i++)
     {
         eval_fast(self,T,B,mul_factor,precomp);   
@@ -281,8 +371,14 @@ static PyMethodDef board_methods[] = {
     {"mean", (PyCFunction) board_mean, METH_NOARGS,
      "calculate mean value in array"
     },
+    {"energy", (PyCFunction) board_energy,METH_NOARGS,
+    "calculate energy"},
     {"evolve_per",(PyCFunction) board_MC_periodic,METH_VARARGS,
     "evolve the board with Metropolis-Hastings algorithm(periodic boundary conditions)"},
+    {"evolve_heath_bath",(PyCFunction) board_heath_bath_periodic,METH_VARARGS,
+    "evolve the board with heath bath MC algorithm (periodic boundary conditions)"},
+    {"evolve_heath_bath_fast",(PyCFunction) board_heath_bath_periodic_fast,METH_VARARGS,
+    "DOES NOT WORK WITH MAGNETIC FIELD, evolve the board with heath bath MC algorithm (periodic boundary conditions)"},
     {"evolve_sta",(PyCFunction) board_MC_static,METH_VARARGS,
     "evolve the board with Metropolis-Hastings algorithm(static boundary conditions)"},
     {"show",(PyCFunction) board_show, METH_NOARGS,
